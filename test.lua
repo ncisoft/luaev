@@ -44,13 +44,13 @@ local function run()
 	local ip, port = ss:getsockname()
 	print("--enter main()...")
 	-- load listen coroutines
-	while 1 do
+	while true do
 		local r_set = {ss}
 		local w_set = {}
 		local ready_forread,msg
 		--table.insert(r_set, ss)
 
-		ready_forread, _,msg = socket.select(r_set, nil, nil)
+		ready_forread, _,msg = socket.select(r_set, nil, 1)
 		for k,v in ipairs(ready_forread) do
 			if (v == ss) then
 				log:debug("accept event occur",msg)
