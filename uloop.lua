@@ -3,6 +3,8 @@ local string = require("string")
 local table = require("table")
 local coroutine = require("coroutine")
 local logging = require("logging")
+local term   = require 'term'
+local colors = term.colors -- or require 'term.colors'
 local os = os
 local ipairs = ipairs
 local pairs = pairs
@@ -19,8 +21,13 @@ module("uloop")
 
 local log = logging.new(function(self, level, message) 
 	local info = debug.getinfo(4)
+	local color_map = {}
+	color_map[ logging.DEBUG ] =  ""
+	color_map[ logging.INFO ] =  colors.yellow
+	color_map[ logging.WARN ] =  colors.red
+	local color = color_map [ level ] or ""
 	local map = { info.short_src,":", info.name or "?", "():",info.currentline or "?"}
-	print(level, table.concat(map),message) return true end)
+	print(color, level, table.concat(map),message,colors.reset) return true end)
 log:setLevel (logging.DEBUG)
 
 local EV = {
@@ -70,39 +77,49 @@ local function join_listener(s)
 end
 
 local function join_read(_co, _socket)
-	_socket:settimeout(0)
 	if (s_maps[ socket ] == nil) then
 		s_maps[_socket] = {co=_co, socket=_socket, r_queue = {}}
-	end
-	if (s_maps[_socket].r_queue == nil) then
-		s_maps[_socket].r_queue = {}
 	end
 end
 
 local function co_accept(_co, listen_socket)
 	while true do
-		local s_child = coroutine.yield()
-		local co_child = coroutind.create(function(_co,listen_s)
-			local data	= co_read(_co, s)
-			if(data == nil) then
-				print("client is dead\n")
-				return
+		log:info({coroutine.running()})
+		local fd = coroutine.yield()
+		log:info({"co_accept coroutine was resumed!",fd})
+		local co_child = coroutine.create(function(fd)
+			local co = coroutine.running()
+			log:warn("child.fork coroutine was resumed")
+			while 1 do
+				local data	= __co_read(co, fd)
+				if(data == nil) then
+					log:debug("client is dead\n")
+					assert(data)
+				end
+				log:debug("receive..."..data.."\n")
+				co_write(co, fd, "+"..data)
 			end
-			print("receive..."..data.."\n")
-			co_write(_co, s, "+PONG")
 		end)
-		coroutine.resume(co_child, co_child, s_child)
+		log:debug("accept a child")
+		coroutine.resume(co_child, fd)
 	end
 end
 
-local function co_read(_co, _socket)
+local function __co_read(_co, _socket)
+	log:warn("......co_read was called")
+	print("lalllaaa")
 	join_read(co, _socket);
-	rc, data = coroutine.yield()
+	data = coroutine.yield()
 	return data
 end
 
+local function co_write(_co, fd, data)
+	join_write(_co, _socket, data)
+	local rc = coroutine.yield(_co)
+	return rc
+end
+
 local function join_write(_co, _socket, data)
-	_socket:settimeout(0)
 	if (s_maps[_socket ] == nil) then
 		s_maps[_socket] = {co=_co, socket=_socket, w_queue = {}}
 	end
@@ -130,43 +147,39 @@ local function schedule(init_co,port)
 				table.insert(w_set, v.socket)
 			end
 		end
-		if(#r_set == 0 and #w_set == 0)  then
-			return
-		end
 		log:debug({r_set_size = #r_set, w_set_size = #w_set, rset=r_set[1]})
-		local readable, writeable, msg = socket.select(r_set, nil, nil)
+		assert(#r_set > 0 or #w_set > 0)
+		local readable, writeable, msg = socket.select(r_set, w_set, nil)
 		for _, s in ipairs(readable) do
-			log:debug({_s=s})
 			local o = s_maps[s]
 			assert(o.socket == s)
 			if (o.is_listen) then
 				local fd,errmsg = s:accept()
-				log:debug(wrap_nil({server=s, client=fd or "nil",error=errmsg or "nil", err=msg or "nil"}))
+				log:debug({server=s, client=fd or "nil",error=errmsg or "nil", err=msg or "nil"})
 				assert(fd)
-				print(debug.traceback ())
-				os.exit(0)
-				accepted_fd:settimeout(0)
-				print("--accept new connection\n")
-				coroutine.resume(o.co, accepted_fd)
+				fd:settimeout(0)
+				log:debug({"accept new connection, will resume accept coroutine",o.co})
+				coroutine.resume(o.co, fd)
 			end
-			if (v.r_queue ~= nil) then
+			if (o.r_queue ~= nil) then
 				local data,errmsg = s.receive(MTU_SIZE)
 				if (data == nil) then
-					print(errmsg.."--read--nil\n")
+					log:debug(errmsg.."--read--nil")
 				end
 				table.insert(v.r_queue, data)
-				coroutine.resume(v.co, v.r_queue)
+				coroutine.resume(v.co, data)
 			end
 		end
 		for i, s in ipairs(writeable) do
-			local v = s_maps(s)
+			local v = s_maps[s]
 			if (v.w_queue ~= nil) then
 				local rc,errmsg,pos = s.send(v.w_queue[1])
 				if (rc == nil) then
-					print(errmsg.."--write--nil\n")
+					log:debug(errmsg.."--write--nil")
+				coroutine.resume(v.co, false)
 				end
-				table.remove(v.r_queue, 1)
-				coroutine.resume(v.co, v.r_queue)
+				table.remove(v.w_queue, 1)
+				coroutine.resume(v.co, true)
 			end
 		end
 	end
