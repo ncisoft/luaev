@@ -16,7 +16,7 @@ local base = _G
 
 module("comessage")
 
-local log = coutils.new_logger()
+local log = coutils.new_logger(coutils.INFO)
 local messages =  {}			-- map: (receiver_id, msg)
 local suspent_coroutines = {} 	-- map: (id, co)
 
@@ -51,7 +51,7 @@ function Mailbox:sendto(receiver_id, msg_body)
 end
 
 function Mailbox:receive()
-	log:warn("receive was call, myid="..(self.id or "nil"))
+	log:debug("receive was call, myid="..(self.id or "nil"))
 	suspent_coroutines[ self.id ] = coroutine.running()
 	local sender_id, msg = coroutine.yield()
 	return sender_id, msg

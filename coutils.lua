@@ -25,6 +25,13 @@ WARN = logging.WARN
 ERROR = logging.ERROR
 FATAL = logging.FATAL
 
+local global_log_level = nil
+
+function set_global_log_level(level)
+	assert(level ~= nil)
+	global_log_level = level
+end
+
 function new_logger(log_level)
 	log_level = log_level or DEBUG
 	local log = logging.new(function(self, level, message) 
@@ -58,7 +65,7 @@ function new_logger(log_level)
 	local color = color_map [ level ] or ""
 	local map = { info.short_src,":", info.name or "?", "():",info.currentline or "?"}
 	print(color, level, table.concat(map),message,colors.reset) return true end)
-	log:setLevel (logging.DEBUG)
+	log:setLevel (global_log_level or log_level)
 	return log
 end
 
