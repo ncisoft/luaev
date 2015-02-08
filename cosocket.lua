@@ -10,23 +10,33 @@ local tostring = tostring
 local base = _G
 
 module("cosocket")
+local cosocket = {} -- the table representing the class, which will double as the metatable for the instances
+--Mailbox.__index = Mailbox -- failed table lookups on the instances should fallback to the class table, to get methods
+
 
 local DEFAULT_BACKLOG = 32
+
+-- @return cosocket
 local function listenTCP(addr, port, backlog)
-	addr = addr or "*"
-	backlog = backlog or DEFAULT_BACKLOG
+	local self = setmetatable({}, {__index=cosocket})
+	self.addr = addr or "*"
+	self.backlog = backlog or DEFAULT_BACKLOG
 end
 
-local function create(co, socket)
+-- @return cosocket
+--
+function create(co, socket)
 	self.co = co
 	self.socket = socket
 	return self
 end
 
-local function connect(addr, port)
+-- @return cosocket
+--
+function connect(addr, port)
 end
 
-local function read()
+local function cosocket:read()
 end
 
 local function write(data)

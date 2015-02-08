@@ -34,13 +34,11 @@ function new_mailbox(my_id)
 	local self = setmetatable({}, {__index=Mailbox})
 	assert(my_id ~= nil)
 	self.id = my_id
-	log:info(self)
 	return self
 end
 
 function Mailbox:sendto(receiver_id, msg_body)
-	log:warn("sendto")
-	log:warn(self)
+	log:debug({sendto=self})
 	local _msg = new_message(self.id, msg_body)
 	assert(receiver_id ~= nil and msg_body ~= nil)
 	if messages[ receiver_id] == nil then
@@ -49,13 +47,11 @@ function Mailbox:sendto(receiver_id, msg_body)
 		table.insert(messages[ receiver_id], _msg)
 	end
 
-	log:warn("...")
 	-- will suspend until receiver get the message
 end
 
 function Mailbox:receive()
-	log:warn("receive was call, myid=")
-	log:debug(self)
+	log:warn("receive was call, myid="..(self.id or "nil"))
 	suspent_coroutines[ self.id ] = coroutine.running()
 	local sender_id, msg = coroutine.yield()
 	return sender_id, msg
@@ -68,7 +64,7 @@ local function step_scheduler()
 		local mailbox = messages[receiver_id]
 		if (mailbox ~= nil) then 
 			local msg = mailbox[1]
-			log:info({msg=msg})
+			log:debug({msg=msg})
 			table.remove(mailbox, 1) 
 			if (#mailbox == 0) then
 				messages[receiver_id] = nil

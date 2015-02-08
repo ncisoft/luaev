@@ -5,6 +5,7 @@ local coroutine = require("coroutine")
 local logging = require("logging")
 local term   = require 'term'
 local colors = term.colors -- or require 'term.colors'
+local trace = require "trace"
 local strict = require("strict")
 local os = os
 local ipairs = ipairs
@@ -25,7 +26,7 @@ local log = logging.new(function(self, level, message)
 	local color_map = {}
 	color_map[ logging.DEBUG ] =  ""
 	color_map[ logging.INFO ] =  colors.yellow
-	color_map[ logging.WARN ] =  colors.cyanred
+	color_map[ logging.WARN ] =  colors.cyan
 	color_map[ logging.ERROR ] =  colors.red
 	--	if (false and level ~= logging.DEBUG) then
 	if (info.currentline ==163) then 

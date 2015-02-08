@@ -2,7 +2,9 @@ local coscheduler = require("coscheduler")
 local comessages = require("comessage")
 local coroutine = require("coroutine")
 local coutils = require("coutils")
+trace = require("trace")
 local print = print
+require("strict")
 
 local log = coutils.new_logger()
 local co_buyer = coroutine.create(function()
