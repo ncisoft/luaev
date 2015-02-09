@@ -38,8 +38,8 @@ local __schedulers = {}
 -- detache
 function attache(co, ...)
 	assert(co)
-	log:debug({co=co, msg="was joined"})
-	co_set[co] = arg
+	log:info({co=co, msg="was joined"})
+	co_set[co] = {is_first_time=true, arg=arg}
 end
 
 join = attache 
@@ -65,17 +65,17 @@ function register_step_scheduler(name, step_func)
 end
 
 function loop()
-	local is_first_time = true
 
 	while true do
-		--log:debug("loop(co_set)")
-		for co,args in pairs(co_set) do
-			if is_first_time then
+		log:info("loop(co_set)")
+		for co,v in pairs(co_set) do
+			if v.is_first_time then
 				log:info({co=co, status=coroutine.status(co)})
-				base.coroutine.resume(co)--, unpack(args))
+				coroutine.resume(co)--, unpack(args))
+				v.is_first_time = false
 			else
 				log:info({co=co, status=coroutine.status(co)})
-				base.coroutine.resume(co)
+				coroutine.resume(co)
 			end
 			if coroutine.status(co) == "dead" then
 				detache(co)
@@ -85,7 +85,7 @@ function loop()
 		for _,co in ipairs(__co_detached_array) do
 			__detache(co)
 		end
-		is_first_time = false
+
 		local n_scheduler, n_false = 0,0
 		for scheduler, step in pairs(__schedulers) do
 			n_scheduler = n_scheduler + 1
