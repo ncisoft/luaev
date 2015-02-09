@@ -13,6 +13,7 @@ local assert = assert
 local print = print
 local type = type
 local tostring = tostring
+local setmetatable = setmetatable
 local debug = debug
 local arg = arg
 local base = _G
@@ -30,6 +31,10 @@ local global_log_level = nil
 function set_global_log_level(level)
 	assert(level ~= nil)
 	global_log_level = level
+end
+
+function __init_object(class)
+	return setmetatable({}, {__index=class})
 end
 
 function new_logger(log_level)

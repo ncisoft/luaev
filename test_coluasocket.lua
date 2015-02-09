@@ -9,8 +9,14 @@ require("strict")
 local log = coutils.new_logger()
 
 local function client_loop(client, userdata)
-	log:warn("co_client was resumed")
+	log:warn({"co_client was resumed", client})
 	log:warn("new client was accepted".."userdata="..(userdata or "nil"))
+	coscheduler.detache()
+	while true do
+		local msg = client:read()
+		log:debug({"client read messages: ", msg})
+		client:write("+"..msg)
+	end
 end
 
 local co_listen = coroutine.create(function()
@@ -18,6 +24,7 @@ local co_listen = coroutine.create(function()
 	coscheduler.detache()
 
 	local listen_s = cosocket.listenTCP("*", 7070)
+	assert(listen_s)
 	while true do
 		listen_s:accept(client_loop, "kid")
 	end
