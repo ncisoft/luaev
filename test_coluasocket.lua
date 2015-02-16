@@ -7,6 +7,8 @@ local cosocket = require("coluasocket")
 require("strict")
 
 local log = coutils.new_logger()
+coutils.set_global_log_level( coutils.FATAL)
+--print(logging.FATAL)
 
 local function client_loop(client, userdata)
 	log:warn({"co_client was resumed", client, coroutine.running()})
@@ -19,6 +21,10 @@ local function client_loop(client, userdata)
 			return
 		end
 		log:debug({out="client read messages: ", msg=msg or "nil", err=err or "nil"})
+		rc = string.find(msg, "PING")
+		if rc == 1 then 
+			msg = "PONG\r\n"
+		end
 		rc,err = client:write("+"..msg)
 	end
 end

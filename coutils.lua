@@ -26,11 +26,12 @@ WARN = logging.WARN
 ERROR = logging.ERROR
 FATAL = logging.FATAL
 
-local global_log_level = nil
+local global_log_level = FATAL
 
 function set_global_log_level(level)
 	assert(level ~= nil)
 	global_log_level = level
+	print("global_log_level==="..(level or "nil"))
 end
 
 function __init_object(class)
@@ -77,6 +78,8 @@ function new_logger(log_level)
 		end
 		return true 
 	end)
+	print("global_log_level="..(global_log_level or "nil"))
+	print("log_level="..(global_log_level or log_level))
 	log:setLevel (global_log_level or log_level)
 	return log
 end
