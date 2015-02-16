@@ -104,8 +104,12 @@ end
 function coluasocket:read(nbytes)
     nbytes = nbytes or MTU_SIZE
 	local out,err = self:receive(nbytes)
-    log:debug("read="..(out or "nil"))
-    return out
+    log:debug({read=out or "nil", err=err or "nil"})
+    return out,err
+end
+
+function coluasocket:__isclosed()
+	return self.is_closed or false
 end
 
 function coluasocket:__close()
@@ -116,9 +120,8 @@ function coluasocket:__close()
 		if (s_maps[self.s] ~= nil) then
 			if (s_maps[self.s].w_queue == nil) then
 				s_maps[self.s] = nil
-			else
-				s_maps[self.s].r_queue = nil
 			end
+			s_maps[self.s].r_queue = nil
 		end
 		-- __detache_write(_socket)
 		if (s_maps[self.s] ~= nil) then
@@ -128,7 +131,6 @@ function coluasocket:__close()
 				s_maps[self.s].w_queue = nil
 			end
 		end
-
 end
 
 
@@ -137,7 +139,7 @@ function coluasocket:receive(nbytes)
     log:debug({msg="......co_read was called", co=_co or "nil"})
     if self.is_close then
         log.error("the socket has been closed")
-        return nil
+        return nil,"closed"
     end
     -- step(1): join read
     if (s_maps[ self.s ] == nil) then
@@ -152,14 +154,14 @@ function coluasocket:receive(nbytes)
         local rc,msg = coroutine.yield()
         log:error({out="......co_read was resume..",rc=rc or "nil", msg=msg or "nil msg"})
         if (msg == "closed") then
-            self:_close()
-            return nil, msg
+            self:__close()
+            return nil, "closed"
         end
 
         local data = table.concat( s_maps[self.s].r_queue )
         if (string.len(data) >= nbytes) then
             s_maps[self.s].r_queue = {string.byte(data, nbytes+1, string.len(data))}
-            return string.byte(1, nbytes),msg
+            return string.byte(1, nbytes),""
         else
             -- still wait for reading
             s_maps[self.s].r_queue = {}
@@ -177,7 +179,7 @@ function coluasocket:send(data)
 	log:info({ev="......co_write was called", data=data or "nil"})
 	if self.is_close then
 		log.error("the socket has been closed")
-		return
+		return false, "closed"
 	end
 
 	data = data or "+hello\n"
@@ -194,6 +196,9 @@ function coluasocket:send(data)
 	--- XXX: really need yield()?
 	local rc,errmsg = coroutine.yield()
 	log:warn({out = "......co_write was resumed", rc=rc or "nil"})
+	if rc == nil and errmsg == "closed" then
+		self:__close()
+	end
 	return rc
 
 end
@@ -207,7 +212,7 @@ local n=0
 local function step_scheduler()
 	-- load listen coroutines
 	if is_first_time then
-		is_first_time = true
+		is_first_time = false
 		log:debug("enter main loop")
 	end
 	-- run once only

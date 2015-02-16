@@ -13,9 +13,13 @@ local function client_loop(client, userdata)
 	log:warn("new client was accepted, userdata="..(userdata or "nil"))
 	coscheduler.detache()
 	while true do
-		local msg, err = client:read()
-		log:debug({out="client read messages: ", msg=msg or "nil"})
-		client:write("+"..msg)
+		local msg, err, rc = client:read()
+		if msg == nil and err == "closed" then
+			log:warn("co_client was closed, the coroutine is going to dead")
+			return
+		end
+		log:debug({out="client read messages: ", msg=msg or "nil", err=err or "nil"})
+		rc,err = client:write("+"..msg)
 	end
 end
 
@@ -29,7 +33,7 @@ local co_listen = coroutine.create(function()
 		listen_s:accept(client_loop, "kid")
 	end
 
-end)
+	end)
 
 
 coscheduler.join(co_listen)
