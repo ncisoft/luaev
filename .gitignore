@@ -15,13 +15,14 @@
 *.exe
 *.out
 *.app
+*.iml
 
 # vim
 .*.sw[a-z]
 *.un~
 Session.vim
 .netrwhist
-
+.idea
 tags
 mini-host
 dnsmasq-vpn

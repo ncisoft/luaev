@@ -3,18 +3,18 @@ local comessages = require("comessage")
 local coroutine = require("coroutine")
 local coutils = require("coutils")
 local cosocket = require("coluasocket")
-trace = require("trace")
+--trace = require("trace")
 require("strict")
 
 local log = coutils.new_logger()
 
 local function client_loop(client, userdata)
-	log:warn({"co_client was resumed", client})
-	log:warn("new client was accepted".."userdata="..(userdata or "nil"))
+	log:warn({"co_client was resumed", client, coroutine.running()})
+	log:warn("new client was accepted, userdata="..(userdata or "nil"))
 	coscheduler.detache()
 	while true do
-		local msg = client:read()
-		log:debug({"client read messages: ", msg})
+		local msg, err = client:read()
+		log:debug({out="client read messages: ", msg=msg or "nil"})
 		client:write("+"..msg)
 	end
 end

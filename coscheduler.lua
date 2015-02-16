@@ -27,6 +27,7 @@ local log = coutils.new_logger()
 local co_set = {}
 local __co_detached_array = {}
 local __schedulers = {}
+local preserved_co_set = {} -- prevent coroutine object to be recycled by gc
 
 
 
@@ -40,18 +41,24 @@ function attache(co, ...)
 	assert(co)
 	log:info({co=co, msg="was joined"})
 	co_set[co] = {is_first_time=true, arg=arg}
+	preserved_co_set[co] = true
 end
 
-join = attache 
+join = attache
+
+function join_once(co, ... )
+	attache(co, ...)
+	co_set[co].is_once = true
+end
 
 function detache(co)
 	co = co or coroutine.running()
-	table.insert(__co_detached_array, co)	
+	table.insert(__co_detached_array, co)
 end
 
 
 -- private method
--- 
+--
 local function __detache(co)
 	assert(co ~= nil)
 	if (co_set[co] ~= nil) then
@@ -76,6 +83,9 @@ function loop()
 			else
 				log:info({co=co, status=coroutine.status(co)})
 				coroutine.resume(co)
+			end
+			if v.is_once then
+				detache(co)
 			end
 			if coroutine.status(co) == "dead" then
 				detache(co)
