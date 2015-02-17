@@ -41,7 +41,7 @@ function attache(co, ...)
 	assert(co)
 	log:info({co=co, msg="was joined"})
 	co_set[co] = {is_first_time=true, arg=arg}
-	preserved_co_set[co] = true
+	--preserved_co_set[co] = true
 end
 
 join = attache

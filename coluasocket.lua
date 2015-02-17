@@ -66,8 +66,24 @@ function listenTCP(addr, port, backlog)
 	assert(self.listen_s:listen(self.backlog))
 --	assert(self.listen_s = socket.bind(self.addr, self.port, self.backlog))
 --	assert(self.listen_s:setoption("reuseaddr", true))
-    log:debug("will join listener")
-	__join_listener(self.listen_s,nil)
+log:debug("will join listener")
+__join_listener(self.listen_s,nil)
+return self
+end
+
+function connectTCP(addr, port)
+	assert(addr ~= nil and port ~= nil)
+	local self = __init()
+	self.s = socket.tcp()
+	self.s:settimeout(0)
+	local rc,err = self.s:connect(addr, port)
+	log:debug({event="connect", rc=rc or "nil", error=err or "nil"})
+	if (s_maps[ self.s ] == nil) then
+		s_maps[ self.s ] =  {co=coroutine.running(), socket=self.s, is_connecting=true,w_queue = {}}
+		log:debug("--accept sock was registered: "..type(coroutine.running()))
+	end
+	rc,err = coroutine.yield()
+	s_maps[ self.s ] = nil
 	return self
 end
 
@@ -87,7 +103,7 @@ function coluasocket:accept(client_handler, userdata)
 
 	local co_client = coroutine.create(function()
 		client_handler(client, userdata)
-	end)
+		end)
 	-- postpone running later
 	coscheduler.join_once(co_client)
 
@@ -95,17 +111,11 @@ function coluasocket:accept(client_handler, userdata)
 	return client
 end
 
--- @return cosocket
---
-function coluasocket:connect(addr, port)
-	local self = __init()
-end
-
 function coluasocket:read(nbytes)
-    nbytes = nbytes or MTU_SIZE
+	nbytes = nbytes or MTU_SIZE
 	local out,err = self:receive(nbytes)
-    log:debug({read=out or "nil", err=err or "nil"})
-    return out,err
+	log:debug({read=out or "nil", err=err or "nil"})
+	return out,err
 end
 
 function coluasocket:__isclosed()
@@ -131,38 +141,38 @@ function coluasocket:__close()
 				s_maps[self.s].w_queue = nil
 			end
 		end
-end
+	end
 
 
-function coluasocket:receive(nbytes)
-    local _co = coroutine.running()
-    log:debug({msg="......co_read was called", co=_co or "nil"})
-    if self.is_close then
-        log.error("the socket has been closed")
-        return nil,"closed"
-    end
+	function coluasocket:receive(nbytes)
+		local _co = coroutine.running()
+		log:debug({msg="......co_read was called", co=_co or "nil"})
+		if self.is_close then
+			log.error("the socket has been closed")
+			return nil,"closed"
+		end
     -- step(1): join read
     if (s_maps[ self.s ] == nil) then
-        s_maps[ self.s ] = {co=_co, socket=self.s, r_queue = {}}
+    	s_maps[ self.s ] = {co=_co, socket=self.s, r_queue = {}}
     else
-        s_maps[self.s].r_queue = {}
+    	s_maps[self.s].r_queue = {}
     end
     -- step(2): yield to read
     local read_done = false
     while not read_done do
     	log:warn({msg="yield to read", co=_co})
-        local rc,msg = coroutine.yield()
-        log:error({out="......co_read was resume..",rc=rc or "nil", msg=msg or "nil msg"})
-        if (msg == "closed") then
-            self:__close()
-            return nil, "closed"
-        end
+    	local rc,msg = coroutine.yield()
+    	log:error({out="......co_read was resume..",rc=rc or "nil", msg=msg or "nil msg"})
+    	if (msg == "closed") then
+    		self:__close()
+    		return nil, "closed"
+    	end
 
-        local data = table.concat( s_maps[self.s].r_queue )
-        if (string.len(data) >= nbytes) then
-            s_maps[self.s].r_queue = {string.byte(data, nbytes+1, string.len(data))}
-            return string.byte(1, nbytes),""
-        else
+    	local data = table.concat( s_maps[self.s].r_queue )
+    	if (string.len(data) >= nbytes) then
+    		s_maps[self.s].r_queue = {string.byte(data, nbytes+1, string.len(data))}
+    		return string.byte(1, nbytes),""
+    	else
             -- still wait for reading
             s_maps[self.s].r_queue = {}
             return data, "timeout"
@@ -176,13 +186,13 @@ end
 
 function coluasocket:send(data)
 
-	log:info({ev="......co_write was called", data=data or "nil"})
-	if self.is_close then
-		log.error("the socket has been closed")
-		return false, "closed"
-	end
+log:info({ev="......co_write was called", data=data or "nil"})
+if self.is_close then
+	log.error("the socket has been closed")
+	return false, "closed"
+end
 
-	data = data or "+hello\n"
+data = data or "+hello\n"
 	--__join_write(_co, fd, data)
 	if (s_maps[self.s ] == nil) then
 		s_maps[self.s] = {co=coroutine.running(), socket=self.s, w_queue = {}}
@@ -215,6 +225,8 @@ local function step_scheduler()
 		is_first_time = false
 		log:debug("enter main loop")
 	end
+	n=n+1
+	
 	-- run once only
 	local r_set = {}
 	local w_set = {}
@@ -224,12 +236,10 @@ local function step_scheduler()
 		if (v.is_listen == true or v.r_queue ~= nil) then
 			table.insert(r_set, v.socket)
 		end
-		if (v.w_queue ~= nil and #v.w_queue > 0) then
+		if (v.is_connecting == true or (v.w_queue ~= nil and #v.w_queue > 0)) then
 			table.insert(w_set, v.socket)
 		end
 	end
-	n = n+1
-	-- assert(n < 18)
 
 	-- step(2): select
 	log:info({r_set_size = #r_set, w_set_size = #w_set, rset=r_set[1], count=n})
@@ -240,35 +250,36 @@ local function step_scheduler()
 		for _, s in ipairs(readable) do
 			local o = s_maps[s]
 			assert(o.socket == s)
-            -- step(2.1): accept
-			if (o.is_listen) then
-				local fd,errmsg = s:accept()
-				log:debug({server=s, client=fd or "nil",error=errmsg or "nil", err=msg or "nil"})
-				assert(fd)
-				fd:settimeout(0)
-				log:debug({"accept new connection, will resume accept coroutine",o.co})
+            -- step(3.1): accept
+            if (o.is_listen) then
+            	local fd,errmsg = s:accept()
+            	log:debug({server=s, client=fd or "nil",error=errmsg or "nil", err=msg or "nil"})
+            	assert(fd)
+            	fd:settimeout(0)
+            	log:debug({"accept new connection, will resume accept coroutine",o.co})
 				--coroutine.resume(o.co, fd)
 				coutils.resume_coroutine(o.co, fd)
-            end
-            -- step(2.2): read
-			if (o.r_queue ~= nil) then
-				log:debug({s=s or "nil"})
-				local data, errmsg, partial = s:receive(MTU_SIZE)
-				if (data == nil) then
-					log:debug({errmsg=errmsg or "nil", data=data or "nil", partial=partial or "nil", o=o})
+			end
+
+            -- step(3.2): read
+            if (o.r_queue ~= nil) then
+            	log:debug({s=s or "nil"})
+            	local data, errmsg, partial = s:receive(MTU_SIZE)
+            	if (data == nil) then
+            		log:debug({errmsg=errmsg or "nil", data=data or "nil", partial=partial or "nil", o=o})
                     -- read partial data
-					if data == nil and partial ~= nil then
-						table.insert(o.r_queue, partial)
-					end
-					if (data == nil and errmsg == "closed") then
-						log:error({socket_is_closed=true, will_resume_read_co=o, co_status=coroutine.status(o.co) or "nil"})
+                    if data == nil and partial ~= nil then
+                    	table.insert(o.r_queue, partial)
+                    end
+                    if (data == nil and errmsg == "closed") then
+                    	log:error({socket_is_closed=true, will_resume_read_co=o, co_status=coroutine.status(o.co) or "nil"})
 						--coroutine.resume(o.co, nil, "closed")
 						coutils.resume_coroutine(o.co, nil, "closed")
-					elseif (data == nil and errmsg == "timeout") then
+						elseif (data == nil and errmsg == "timeout") then
                         -- TODO: optimize the code
                         log:info({msg="resume with partial data", o=o, status=coroutine.status(o.co)})
                         --debug.debug()
-						local rc, comsg = coutils.resume_coroutine(o.co, true, nil)
+                        local rc, comsg = coutils.resume_coroutine(o.co, true, nil)
 						--coroutine.resume(o.co, true, nil)
 						log:info({msg="resume return", rc = rc or "nil", comsg=comsg or "nil"})
 					end
@@ -284,6 +295,16 @@ local function step_scheduler()
 		-- step(4): process write event
 		for _, s in ipairs(writeable) do
 			local v = s_maps[s]
+
+			-- step(4.1): handle connect event
+			if (v.is_connecting) then
+				log:debug({event="select.connect",server=s})
+				log:debug({event="connect is success, will resume accept coroutine",v.co})
+				--coroutine.resume(o.co, fd)
+				coutils.resume_coroutine(v.co, true)
+			end
+
+			-- step(4.2): handle write event
 			if (v.w_queue ~= nil and #v.w_queue > 0) then
 				log:debug({will_resume_write_co=v,status=coroutine.status(v.co)})
 				local rc, errmsg, partial_index = s:send(v.w_queue[1])
@@ -301,16 +322,16 @@ local function step_scheduler()
 					if (errmsg == "closed") then
 						-- tell client the socket was closed
 						coutils.resume_coroutine(v.co, false,errmsg)
-					elseif (errmsg == "timeout") then 
-						coutils.resume_coroutine(v.co, true, errmsg)
-					end
+						elseif (errmsg == "timeout") then 
+							coutils.resume_coroutine(v.co, true, errmsg)
+						end
 				else -- write success, remove sent data from queue
 					table.remove(v.w_queue, 1)
 					coutils.resume_coroutine(v.co, true,errmsg)
 				end
 			end
 		end
-	end -- end of loop
+	end
 
 end
 

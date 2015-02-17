@@ -26,7 +26,7 @@ WARN = logging.WARN
 ERROR = logging.ERROR
 FATAL = logging.FATAL
 
-local global_log_level = FATAL
+local global_log_level 
 
 function set_global_log_level(level)
 	assert(level ~= nil)
@@ -49,7 +49,7 @@ function new_logger(log_level)
 		color_map[ logging.WARN ] =  colors.cyan
 		color_map[ logging.ERROR ] =  colors.red
 		--	if (false and level ~= logging.DEBUG) then
-		if (info.currentline ==163) then 
+		if (false and info.currentline ==163) then 
 			local i, flag = 2, true
 			while flag do
 				i=i+1	
@@ -78,8 +78,6 @@ function new_logger(log_level)
 		end
 		return true 
 	end)
-	print("global_log_level="..(global_log_level or "nil"))
-	print("log_level="..(global_log_level or log_level))
 	log:setLevel (global_log_level or log_level)
 	return log
 end
