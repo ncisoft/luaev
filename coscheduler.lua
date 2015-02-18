@@ -15,6 +15,7 @@ local print = print
 local type = type
 local tostring = tostring
 local unpack = unpack
+local collectgarbage = collectgarbage
 local debug = debug
 local arg = arg
 local base = _G
@@ -72,25 +73,27 @@ function register_step_scheduler(name, step_func)
 end
 
 function loop()
-
+	local  n = 0
 	while true do
 		log:info("loop(co_set)")
+		n = n+1
+
 		for co,v in pairs(co_set) do
 			if v.is_first_time then
 				log:info({co=co, status=coroutine.status(co)})
 				coroutine.resume(co)--, unpack(args))
-				v.is_first_time = false
-			else
-				log:info({co=co, status=coroutine.status(co)})
-				coroutine.resume(co)
-			end
-			if v.is_once then
-				detache(co)
-			end
-			if coroutine.status(co) == "dead" then
-				detache(co)
-			end
-		end
+v.is_first_time = false
+else
+	log:info({co=co, status=coroutine.status(co)})
+	coroutine.resume(co)
+end
+if v.is_once then
+	detache(co)
+end
+if coroutine.status(co) == "dead" then
+	detache(co)
+end
+end
 		--log:debug("loop(detache)")
 		for _,co in ipairs(__co_detached_array) do
 			__detache(co)
@@ -106,6 +109,11 @@ function loop()
 		if n_scheduler == n_false then
 			return
 		end
+		if n % 100 == 0 then
+			coutils.collectgarbage()
+		end
+
+
 	end
 end
 

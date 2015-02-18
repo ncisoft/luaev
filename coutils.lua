@@ -14,6 +14,7 @@ local print = print
 local type = type
 local tostring = tostring
 local setmetatable = setmetatable
+local snapshot = require("snapshot")
 local debug = debug
 local arg = arg
 local base = _G
@@ -26,7 +27,7 @@ WARN = logging.WARN
 ERROR = logging.ERROR
 FATAL = logging.FATAL
 
-local global_log_level 
+local global_log_level =FATAL
 
 function set_global_log_level(level)
 	assert(level ~= nil)
@@ -35,7 +36,12 @@ function set_global_log_level(level)
 end
 
 function __init_object(class)
-	return setmetatable({}, {__index=class})
+	assert(type(class) == "table")
+	if class.__index == nil then
+		class.__index = class
+	end
+	return setmetatable({}, class)
+	--return setmetatable({}, {__index=class})
 end
 
 function new_logger(log_level)
@@ -91,4 +97,18 @@ function resume_coroutine(co, ... )
 		log:error(debug.traceback(co))
 	end
 	return rc, message
+end
+
+local S1 = snapshot()
+function collectgarbage( )
+	log:fatal({event="collectgarbage.count", out=base.collectgarbage("count"), count=n})
+	base.collectgarbage("collect")
+	local S2 = snapshot()
+	log:fatal({event="collectgarbage.aftergc", out=base.collectgarbage("count"), count=n})
+	for k,v in pairs(S2) do
+	if S1[k] == nil then
+		print(k,v)
+	end
+end
+	print("")
 end

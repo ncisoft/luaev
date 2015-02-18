@@ -12,6 +12,7 @@ local print = print
 local type = type
 local string = string
 local debug = debug
+local collectgarbage = collectgarbage
 local base = _G
 
 module("coluasocket")
@@ -122,10 +123,17 @@ function coluasocket:__isclosed()
 	return self.is_closed or false
 end
 
+function coluasocket:close()
+	if not self.is_closed then
+		self.s:__close()
+	end
+end
+	
 function coluasocket:__close()
 	self.is_closed = true
-		-- TODO: detach from reg_event
-		log:error({s=self.s, msg="the socket was closed"})
+	self.s:close()
+	-- TODO: detach from reg_event
+	log:error({s=self.s, msg="the socket was closed"})
 		-- __detache_read(_socket)
 		if (s_maps[self.s] ~= nil) then
 			if (s_maps[self.s].w_queue == nil) then
@@ -141,6 +149,7 @@ function coluasocket:__close()
 				s_maps[self.s].w_queue = nil
 			end
 		end
+		s_maps[self.s] = nil
 	end
 
 
