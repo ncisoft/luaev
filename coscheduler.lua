@@ -111,7 +111,7 @@ end
 		end
 		if n % 10 == 0 then
 			--debug.debug()
-			coutils.collectgarbage()
+			--coutils.collectgarbage()
 		end
 
 

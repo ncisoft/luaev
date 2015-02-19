@@ -6,8 +6,8 @@ CFLAGS += -O2
 LDFLAGS += -llua5.1
 
 ifdef JIT
-	CFLAGS += -I $(LUAJIT_HOME)/include
-	LDFLAGS += -L $(LUAJIT_HOME)/lib
+	CFLAGS += -I /opt/luajit/include/luajit-2.0
+	LDFLAGS += -L /opt/luajit/lib/
 else
 	CFLAGS += -I /usr/include/lua5.1/
 	LDFLAGS += -L /usr/lib/i386-linux-gnu/
