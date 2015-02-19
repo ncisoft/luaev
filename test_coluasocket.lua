@@ -7,8 +7,6 @@ local cosocket = require("coluasocket")
 require("strict")
 
 local log = coutils.new_logger()
-coutils.set_global_log_level( coutils.FATAL)
---print(logging.FATAL)
 
 local function client_loop(client, userdata)
 	log:warn({"co_client was resumed", client, coroutine.running()})

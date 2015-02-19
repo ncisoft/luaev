@@ -109,7 +109,8 @@ end
 		if n_scheduler == n_false then
 			return
 		end
-		if n % 100 == 0 then
+		if n % 10 == 0 then
+			--debug.debug()
 			coutils.collectgarbage()
 		end
 

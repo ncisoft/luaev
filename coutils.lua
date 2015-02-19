@@ -4,6 +4,7 @@ local table = require("table")
 local coroutine = require("coroutine")
 local logging = require("logging")
 local term   = require 'term'
+local config = require("config")
 local colors = term.colors -- or require 'term.colors'
 local strict = require("strict")
 local os = os
@@ -27,7 +28,7 @@ WARN = logging.WARN
 ERROR = logging.ERROR
 FATAL = logging.FATAL
 
-local global_log_level =FATAL
+local global_log_level = config.global_log_level
 
 function set_global_log_level(level)
 	assert(level ~= nil)
@@ -63,16 +64,16 @@ function new_logger(log_level)
 				info = debug.getinfo(i)
 				if (info.currentline > 0) then
 					flag = false
-				elseif (info["source"] == "[C]") then 
-					info = debug.getinfo(4)
-					flag = false
-				else
-					for k,v in pairs(info) do
-						print(k.."="..tostring(v))
+					elseif (info["source"] == "[C]") then 
+						info = debug.getinfo(4)
+						flag = false
+					else
+						for k,v in pairs(info) do
+							print(k.."="..tostring(v))
+						end
 					end
 				end
 			end
-		end
 		--info = debug.getinfo(4)
 
 		local color = color_map [ level ] or ""
@@ -83,9 +84,10 @@ function new_logger(log_level)
 			print(color, level, table.concat(map),message,colors.reset) 
 		end
 		return true 
-	end)
-	log:setLevel (global_log_level or log_level)
-	return log
+		end)
+print(string.format("!!!global_log_level=%s,%s", global_log_level, config.global_log_level))
+log:setLevel (global_log_level or log_level)
+return log
 end
 
 local log = new_logger()
@@ -101,14 +103,15 @@ end
 
 local S1 = snapshot()
 function collectgarbage( )
+
 	log:fatal({event="collectgarbage.count", out=base.collectgarbage("count"), count=n})
 	base.collectgarbage("collect")
-	local S2 = snapshot()
+	--local S2 = snapshot()
 	log:fatal({event="collectgarbage.aftergc", out=base.collectgarbage("count"), count=n})
-	for k,v in pairs(S2) do
-	if S1[k] == nil then
-		print(k,v)
-	end
-end
+	--for k,v in pairs(S2) do
+	--if S1[k] == nil then
+	--	print(k,v)
+	--end
+	--end
 	print("")
 end

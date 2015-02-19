@@ -1,4 +1,4 @@
-local socket = require("socket")
+local socket = require("socketext")
 local string = require("string")
 local table = require("table")
 local coroutine = require("coroutine")
@@ -133,7 +133,7 @@ function coluasocket:__close()
 	self.is_closed = true
 	self.s:close()
 	-- TODO: detach from reg_event
-	log:error({s=self.s, msg="the socket was closed"})
+	log:warn({s=self.s, msg="the socket was closed"})
 		-- __detache_read(_socket)
 		if (s_maps[self.s] ~= nil) then
 			if (s_maps[self.s].w_queue == nil) then
@@ -171,7 +171,7 @@ function coluasocket:__close()
     while not read_done do
     	log:warn({msg="yield to read", co=_co})
     	local rc,msg = coroutine.yield()
-    	log:error({out="......co_read was resume..",rc=rc or "nil", msg=msg or "nil msg"})
+    	log:debug({out="......co_read was resume..",rc=rc or "nil", msg=msg or "nil msg"})
     	if (msg == "closed") then
     		self:__close()
     		return nil, "closed"
@@ -252,11 +252,16 @@ local function step_scheduler()
 
 	-- step(2): select
 	log:info({r_set_size = #r_set, w_set_size = #w_set, rset=r_set[1], count=n})
+	for i, s in ipairs(r_set) do
+		log:debug({event=string.format("r_set[%d]", i), s=s})
+	end
 	if (#r_set > 0 or #w_set > 0) then
 		local readable, writeable, msg = socket.select(r_set, w_set, nil)
 
+		--log:debug(readable)
 		-- step(3): process read event
 		for _, s in ipairs(readable) do
+			log:debug(s)
 			local o = s_maps[s]
 			assert(o.socket == s)
             -- step(3.1): accept
@@ -281,7 +286,7 @@ local function step_scheduler()
                     	table.insert(o.r_queue, partial)
                     end
                     if (data == nil and errmsg == "closed") then
-                    	log:error({socket_is_closed=true, will_resume_read_co=o, co_status=coroutine.status(o.co) or "nil"})
+                    	log:debug({socket_is_closed=true, will_resume_read_co=o, co_status=coroutine.status(o.co) or "nil"})
 						--coroutine.resume(o.co, nil, "closed")
 						coutils.resume_coroutine(o.co, nil, "closed")
 						elseif (data == nil and errmsg == "timeout") then
