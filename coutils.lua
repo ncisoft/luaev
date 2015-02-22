@@ -48,7 +48,7 @@ end
 function new_logger(log_level)
 	log_level = log_level or DEBUG
 	local log = logging.new(function(self, level, message) 
-		local info = debug.getinfo(4)
+		local info = debug.getinfo(4) or debug.getinfo(2)
 		local is_windows = os.getenv("windir") and true
 		local color_map = {}
 		color_map[ logging.DEBUG ] =  ""

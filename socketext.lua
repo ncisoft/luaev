@@ -1,3 +1,4 @@
+local config = require("config")
 local socket = require("socket")
 local socket_ext = require("socket_ext")
 local string = require("string")
@@ -14,6 +15,7 @@ local type = type
 local string = string
 local debug = debug
 local collectgarbage = collectgarbage
+local getmetatable = getmetatable
 local base = _G
 
 module("socketext")
@@ -23,8 +25,9 @@ local fd2s_map = {}
 local poller_fd = nil
 
 local log = coutils.new_logger(coutils.DEBUG)
+local wrapper = {}
 
-function ev_select(recvt, sendt, timeout)
+local function __select_wrapper(recvt, sendt, timeout)
 log:info("enter ev_select")
 	-- step(1): create poller_fd
 	if poller_fd == nil then
@@ -77,9 +80,61 @@ log:info("enter ev_select")
 	return readable,writeable,msg
 end
 
+local class_metatables = {}
+local function __intercept_metatable(tcp)
+	local class = tcp.class
+	local tcp_metatable = class_metatables [class]
+	if tcp_metatable == nil then
+		local tcp_meta_index = {}
+		tcp_metatable = base.getmetatable(tcp)
+		tcp_meta_index.__close = tcp_metatable.__index.close
+		--tcp_meta_index.__connect = x.__index.connect
+		tcp_meta_index.__accept = tcp_metatable.__index.accept
+		tcp_meta_index.close = wrapper.__close
+		--tcp_meta_index.connect = __connect_wrapper
+		tcp_meta_index.accept = wrapper.__accept
+		for k,v in pairs(tcp_meta_index) do
+			tcp_metatable.__index[k] = v
+		end
+	end
+	debug.setmetatable(tcp, tcp_metatable)
+end 
+wrapper.__select = __select_wrapper
+
+local function __close_wraper(tcp_s)
+	socket_ext.unregister_fd(poller_fd, tcp_s.getfd())
+	self:__close()
+end
+wrapper.__close = __close_wraper
 
 
+local function __connect_wrapper(tcp_s, addr, port)
+end
+wrapper.__connect = __connect_wrapper
 
+local function __accept_wrapper(listen_s)
+	local client_s, errmsg = listen_s:__accept()
+	if client_s ~= nil then
+		__intercept_metatable(client_s)
+	end
+	return client_s,errmsg
+end
+wrapper.__accept = __accept_wrapper
 
-socket.select = ev_select
+local function __tcp_wrapper()
+	log:debug("socket.tcp")
+	local tcp,msg = socket.__tcp()
+	if tcp ~= nil then
+		__intercept_metatable(tcp)
+	end
+	return tcp,msg
+end
+wrapper.__tcp = __tcp_wrapper
+
+socket.__select = socket.select
+socket.__tcp = socket.tcp
+
+socket.select = __select_wrapper
+socket.tcp = __tcp_wrapper
+
 return socket
