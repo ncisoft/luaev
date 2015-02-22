@@ -27,11 +27,17 @@ local poller_fd = nil
 local log = coutils.new_logger(coutils.DEBUG)
 local wrapper = {}
 
+local n = 0
 local function __select_wrapper(recvt, sendt, timeout)
 log:info("enter ev_select")
 	-- step(1): create poller_fd
 	if poller_fd == nil then
 		poller_fd = socket_ext.create_poller()
+	end
+	n=n+1
+	if n%1000 == 0 then
+		s2fd_map = coutils.compact_table(s2fd_map)
+		fd2s_map = coutils.compact_table(fd2s_map)
 	end
 	-- step(2) register event
 	for _,s in ipairs(recvt) do
@@ -87,39 +93,71 @@ local function __intercept_metatable(tcp)
 	if tcp_metatable == nil then
 		local tcp_meta_index = {}
 		tcp_metatable = base.getmetatable(tcp)
+		tcp_meta_index.__bind = tcp_metatable.__index.bind
+		tcp_meta_index.__listen = tcp_metatable.__index.listen
+		tcp_meta_index.__accept = tcp_metatable.__index.accept
 		tcp_meta_index.__close = tcp_metatable.__index.close
 		--tcp_meta_index.__connect = x.__index.connect
-		tcp_meta_index.__accept = tcp_metatable.__index.accept
+		tcp_meta_index.bind = wrapper.__bind
+		tcp_meta_index.listen = wrapper.__listen
+		tcp_meta_index.accept = wrapper.__accept
 		tcp_meta_index.close = wrapper.__close
 		--tcp_meta_index.connect = __connect_wrapper
-		tcp_meta_index.accept = wrapper.__accept
 		for k,v in pairs(tcp_meta_index) do
 			tcp_metatable.__index[k] = v
 		end
 	end
 	debug.setmetatable(tcp, tcp_metatable)
+	class_metatables [class] = tcp_metatable
+	log:error({event="tcp __intercept_metatable", meta= base.getmetatable(tcp), new_accept=wrapper.__accept, s=tcp})
+	log:error({wrapper=wrapper})
 end 
 wrapper.__select = __select_wrapper
 
 local function __close_wraper(tcp_s)
-	socket_ext.unregister_fd(poller_fd, tcp_s.getfd())
-	self:__close()
-end
-wrapper.__close = __close_wraper
+	socket_ext.unregister_fd(poller_fd, tcp_s:getfd())
+	log:info({event="unregister_fd", fd=tcp_s:getfd()})
+	s2fd_map[tcp_s] = nil
+	fd2s_map[tcp_s:getfd()] = nil
+	tcp_s:__close()
 
+end
+wrapper.__close = __close_wraper				-- checked
+
+
+local function __bind_wrapper(s, addr, port)	-- "tcp{master} --> "tcp{server}
+	local rc, msg = s:__bind(addr, port)
+	if rc ~= nil then
+		__intercept_metatable(s)
+	end
+	log:error("__bind_wrapper")
+	return rc,msg
+end
+wrapper.__bind = __bind_wrapper					-- checked
+
+local function __listen_wrapper(s, backlog)	-- "tcp{master} --> "tcp{server}
+	local rc, msg = s:__listen(backlog)
+	if rc ~= nil then
+		__intercept_metatable(s)
+	end
+	log:error("__listen_wrapper")
+	return rc,msg
+end
+wrapper.__listen = __listen_wrapper					-- checked
 
 local function __connect_wrapper(tcp_s, addr, port)
 end
-wrapper.__connect = __connect_wrapper
+wrapper.__connect = __connect_wrapper			-- checked
 
 local function __accept_wrapper(listen_s)
 	local client_s, errmsg = listen_s:__accept()
 	if client_s ~= nil then
 		__intercept_metatable(client_s)
 	end
+	log:error("__accept_wrapper")
 	return client_s,errmsg
 end
-wrapper.__accept = __accept_wrapper
+wrapper.__accept = __accept_wrapper				-- checked
 
 local function __tcp_wrapper()
 	log:debug("socket.tcp")
@@ -129,12 +167,17 @@ local function __tcp_wrapper()
 	end
 	return tcp,msg
 end
-wrapper.__tcp = __tcp_wrapper
+wrapper.__accept = __accept_wrapper				-- checkeds
 
-socket.__select = socket.select
-socket.__tcp = socket.tcp
+if config.global_use_socket_ev then
+	wrapper.__tcp = __tcp_wrapper
 
-socket.select = __select_wrapper
-socket.tcp = __tcp_wrapper
+	socket.__select = socket.select
+	socket.__tcp = socket.tcp
 
+	socket.select = __select_wrapper
+	socket.tcp = __tcp_wrapper
+
+	log:error("socketext was injected!!!")
+end
 return socket

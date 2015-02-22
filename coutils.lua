@@ -36,6 +36,15 @@ function set_global_log_level(level)
 	print("global_log_level==="..(level or "nil"))
 end
 
+function compact_table(tbl)
+	local out = {}
+	for k,v in pairs(tbl) do
+		out[k] = v
+	end
+	return out
+end
+
+
 function __init_object(class)
 	assert(type(class) == "table")
 	if class.__index == nil then
@@ -85,7 +94,6 @@ function new_logger(log_level)
 		end
 		return true 
 		end)
-print(string.format("!!!global_log_level=%s,%s", global_log_level, config.global_log_level))
 log:setLevel (global_log_level or log_level)
 return log
 end
@@ -97,6 +105,7 @@ function resume_coroutine(co, ... )
 	if rc == false then
 		log:error({co=co, status=coroutine.status(co), event = "resume coroutine fail", message = message or "nil"})
 		log:error(debug.traceback(co))
+		error()
 	end
 	return rc, message
 end
@@ -114,4 +123,9 @@ function collectgarbage( )
 	--end
 	--end
 	print("")
+end
+
+function is_jit()
+	return config.global_is_jit
+	-- body
 end

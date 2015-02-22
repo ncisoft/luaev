@@ -71,12 +71,16 @@ function listenTCP(addr, port, backlog)
 	log:debug("--enter listenTCP(),will listen on port:"..port)
 	self.listen_s = socket.tcp()
 	assert(self.listen_s:setoption("reuseaddr", true))
+	--log:error({event="...after setoption", meta= base.getmetatable(self.listen_s), s=self.listen_s})
 	assert(self.listen_s:bind(self.addr, self.port))
+	--log:error({event="...after bind", meta= base.getmetatable(self.listen_s), s=self.listen_s})
 	assert(self.listen_s:listen(self.backlog))
+	log:error({event="...after listen", meta= base.getmetatable(self.listen_s), s=self.listen_s})
 	--	assert(self.listen_s = socket.bind(self.addr, self.port, self.backlog))
 	--	assert(self.listen_s:setoption("reuseaddr", true))
 	log:debug("will join listener")
 	__join_listener(self.listen_s,nil)
+	--log:error({event="...", meta= base.getmetatable(self.listen_s), s=self.listen_s})
 	return self
 end
 
@@ -133,7 +137,7 @@ end
 
 function coluasocket:close()
 	if not self.is_closed then
-		self.s:__close()
+		self.s:close()
 	end
 end
 
@@ -283,6 +287,8 @@ local function step_scheduler()
 				assert(fd)
 				fd:settimeout(0)
 				log:debug({"accept new connection, will resume accept coroutine",o.co})
+				--log:error({event="......", meta= base.getmetatable(s), s=s})
+				--log:error({event="......", meta= base.getmetatable(fd), fd=fd})
 				--coroutine.resume(o.co, fd)
 				coutils.resume_coroutine(o.co, fd)
 			end
