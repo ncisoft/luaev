@@ -3,12 +3,12 @@ local string = require("string")
 local table = require("table")
 local coroutine = require("coroutine")
 local logging = require("logging")
-local io = io
 local term   = require 'term'
 local config = require("config")
 local colors = term.colors -- or require 'term.colors'
+local copool = require("copool")
 local strict = require("strict")
-local os = require("os")
+local os = os
 local ipairs = ipairs
 local pairs = pairs
 local assert = assert
@@ -18,12 +18,10 @@ local tostring = tostring
 local setmetatable = setmetatable
 local snapshot = require("snapshot")
 local debug = debug
---local arg = arg
-local error = error
-local io = require("io")
+local arg = arg
 local base = _G
 
-module("coutils") 
+module("coutils_ext") 
 
 DEBUG = logging.DEBUG
 INFO = logging.INFO
@@ -67,7 +65,6 @@ function new_logger(log_level)
 		color_map[ logging.INFO ] =  colors.yellow
 		color_map[ logging.WARN ] =  colors.cyan
 		color_map[ logging.ERROR ] =  colors.red
-		color_map[ logging.FATAL ] =  colors.red
 		--	if (false and level ~= logging.DEBUG) then
 		if (false and info.currentline ==163) then 
 			local i, flag = 2, true
@@ -104,12 +101,18 @@ end
 
 local log = new_logger()
 
+local __copool = copool.new()
+
+function create_coroutine(f)
+	return __copool:create(f)
+end
+
 function resume_coroutine(co, ... )
 	local rc,message = coroutine.resume(co,...)
 	if rc == false then
 		log:error({co=co, status=coroutine.status(co), event = "resume coroutine fail", message = message or "nil"})
 		log:error(debug.traceback(co))
-		error("fatal exit")
+		error()
 	end
 	return rc, message
 end
@@ -132,31 +135,4 @@ end
 function is_jit()
 	return config.global_is_jit
 	-- body
-end
-
-function parse_thread_body(fname)
-	if fname == nil then
-		local info = debug.getinfo(4) or debug.getinfo(2)
-		assert(info)
-		log:debug({info=info})
-		fname = info.short_src
-	end
-	local fd = io.open(fname, "r")
-	local content = fd:read("*a")
-	local xstart, xend, i ,j 
-	fd:close()
-
-	i,j= string.find(content, "%-%-thread%-begin")
-	if (i ~= nil) then 
-		xstart = j + 1
-		log:debug("111")
-		i, j = string.find(content, "%-%-thread%-end")
-		if (i ~= nil) then 
-			xend = i - 1
-			out = string.sub(content, xstart, xend)
-			--print(out)
-			return out
-		end
-	end
-
 end

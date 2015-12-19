@@ -27,6 +27,7 @@ local poller_fd = nil
 local log = coutils.new_logger(coutils.DEBUG)
 local wrapper = {}
 
+log:fatal("pid="..socket_ext.getpid())
 local n = 0
 local function __select_wrapper(recvt, sendt, timeout)
 log:info("enter ev_select")

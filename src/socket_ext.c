@@ -4,6 +4,7 @@
 #include "lauxlib.h"
 #include "lualib.h"
 #include <stdbool.h>
+#include <sys/types.h>
 #include <unistd.h>
 #include "socket_poll.h"
 
@@ -24,6 +25,11 @@ static int meth_select_ev(lua_State *L)
 	return 1;
 }
 
+static int meth_getpid(lua_State *L)
+{
+	lua_pushinteger(L, getpid());
+	return 1;
+}
 // lua usage: wait_ev(poller_fd, timeout):socket[]
 static int method_wait_ev(lua_State *L)
 {
@@ -130,6 +136,7 @@ static const luaL_reg socket_ext_reg[] = {
 	{"register_fd",   	method_register_fd},
 	{"unregister_fd",   method_unregister_fd},
     {"wait_ev",   		method_wait_ev},
+    {"getpid",			meth_getpid},
     {"test",			method_test},
     {NULL, NULL}
 };

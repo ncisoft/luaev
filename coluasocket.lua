@@ -27,7 +27,7 @@ local MTU_SIZE = 20480
 --local ev_cos= { listen = {}, read = {}, write = {} }
 local s_maps = {}	-- key=luasocket, value= {co, is_listen, r_queue{}, w_queue{}}
 
-function compact_table(tbl)
+local function compact_table(tbl)
 	local out = {}
 	for k,v in pairs(tbl) do
 		out[k] = v
@@ -56,7 +56,9 @@ local function __join_listener(s,co)
 end
 
 local function __init()
-	return coutils.__init_object(coluasocket)
+	local self = coutils.__init_object(coluasocket)
+	self.is_first_write=false
+	return self
 	--return setmetatable({}, {__index=coluasocket})
 end
 
@@ -75,7 +77,7 @@ function listenTCP(addr, port, backlog)
 	assert(self.listen_s:bind(self.addr, self.port))
 	--log:error({event="...after bind", meta= base.getmetatable(self.listen_s), s=self.listen_s})
 	assert(self.listen_s:listen(self.backlog))
-	log:error({event="...after listen", meta= base.getmetatable(self.listen_s), s=self.listen_s})
+	--log:error({event="...after listen", meta= base.getmetatable(self.listen_s), s=self.listen_s})
 	--	assert(self.listen_s = socket.bind(self.addr, self.port, self.backlog))
 	--	assert(self.listen_s:setoption("reuseaddr", true))
 	log:debug("will join listener")
@@ -115,11 +117,13 @@ function coluasocket:accept(client_handler, userdata)
 	__join_listener(self.listen_s, nil) -- detache accept coroutine from listen socket, will be attached next time
 
 	local co_client = coroutine.create(function()
+		log:debug("coscheduler.join_once(co_client)")
+		client.is_first_write = false
 		client_handler(client, userdata)
+		log:debug("coscheduler.join_once(co_client)")
 	end)
 	-- postpone running later
 	coscheduler.join_once(co_client)
-
 
 	return client
 end
@@ -193,7 +197,7 @@ function coluasocket:receive(nbytes)
 		if (string.len(data) >= nbytes) then
 			s_maps[self.s].r_queue = {string.byte(data, nbytes+1, string.len(data))}
 			return string.byte(1, nbytes),""
-		else
+	else
 			-- still wait for reading
 			s_maps[self.s].r_queue = {}
 			return data, "timeout"
@@ -221,17 +225,39 @@ function coluasocket:send(data)
 	if (s_maps[self.s].w_queue == nil) then
 		s_maps[self.s].w_queue = {}
 	end
-	table.insert(s_maps[self.s].w_queue, data)
-	log:debug({s=s_maps[self.s]})
 
-	--- XXX: really need yield()?
-	local rc,errmsg = coroutine.yield()
-	log:warn({out = "......co_write was resumed", rc=rc or "nil"})
-	if rc == nil and errmsg == "closed" then
-		self:__close()
-	end
-	return rc
+	if self.is_first_write == true then
+		local sent_index, msg, partial_index = self.s:send(data)
+		if (msg == nil) then
+			table.insert(s_maps[self.s].w_queue, data)
+			log:debug({s=s_maps[self.s]})
+			-- TODO: sent_index may be nil
+			elseif sent_index < string.len(data) then
+				data = string.byte(data,sent_index + 1, tring.len(data))
+				table.insert(s_maps[self.s].w_queue, data)
+				log:debug({s=s_maps[self.s]})
 
+				--- XXX: really need yield()?
+				local rc,errmsg = coroutine.yield()
+				log:warn({out = "......co_write was resumed", rc=rc or "nil"})
+				if rc == nil and errmsg == "closed" then
+					self:__close()
+				end
+				return rc
+			end
+
+		else
+			table.insert(s_maps[self.s].w_queue, data)
+			log:debug({s=s_maps[self.s]})
+			self.is_first_write = true
+				--- XXX: really need yield()?
+				local rc,errmsg = coroutine.yield()
+				log:warn({out = "......co_write was resumed", rc=rc or "nil"})
+				if rc == nil and errmsg == "closed" then
+					self:__close()
+				end
+				return rc
+			end
 end
 
 -- TODO: 
@@ -347,7 +373,7 @@ local function step_scheduler()
 					if (partial_index ~= nil) then
 						local msg = v.w_queue[1]
 						msg = string.byte(msg, partial_index+1, string.len(msg))
-						table.remove(1)
+						table.remove(v.w_queue, 1)
 						table.insert(v.w_queue, 1, msg)
 					end
 

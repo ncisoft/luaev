@@ -1,4 +1,5 @@
 local g=_G
+debug = require("debug")
 module("Strict")
 strict,strong=true,false
 

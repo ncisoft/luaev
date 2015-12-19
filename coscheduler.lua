@@ -17,7 +17,7 @@ local tostring = tostring
 local unpack = unpack
 local collectgarbage = collectgarbage
 local debug = debug
-local arg = arg
+--local arg = arg
 local base = _G
 
 -- purpose: will handle with socket_coroutine, file_coroutine, timer_coroutine, ordinary_coroutine
@@ -85,7 +85,8 @@ function loop()
 v.is_first_time = false
 else
 	log:info({co=co, status=coroutine.status(co)})
-	coroutine.resume(co)
+	coutils.resume_coroutine(co)
+	--coroutine.resume(co)
 end
 if v.is_once then
 	detache(co)
